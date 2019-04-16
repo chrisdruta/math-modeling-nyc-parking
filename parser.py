@@ -27,15 +27,15 @@ def parse(filenameList):
 
 def generateTrips(filename, numDataSets, percentUsing):
     """
-    Samples n rows from filename and sort sample by time
+    Samples a parsed csv with respect to it's time distriubtion 
 
     Args:
-        filename: name of file to sample and sort data from
+        filename: name of file to sample from (should be output of parse func above)
         numDataSets: number of datasets used to generate file
         percentUsing: percent of taxi rider population that is replace by SAV
 
     Returns:
-        trips: deque object containing sorted sample
+        trips: numpy array containing samples
     """
 
     data = pd.read_csv(filename).values
@@ -55,12 +55,10 @@ def generateTrips(filename, numDataSets, percentUsing):
     # Sample trips according to time distribution
     sample = np.random.choice(np.arange(0, 24), size=n, p=timeDistribution)
 
-    # Randomly sample existing trips and sort them
+    # Randomly sample existing trips and add them to new list
     trips = []
     for time in range(24):
         indices = np.random.choice(len(data[data[:, 0] == time]), size=len(sample[sample == time]))
-        subTrips = data[data[:, 0] == time][indices]
-        trips.extend((subTrips[np.argsort(subTrips[:, 1])]).tolist())
+        trips.extend(data[data[:, 0] == time][indices])
 
-    return deque(trips)
-
+    return np.array(trips)

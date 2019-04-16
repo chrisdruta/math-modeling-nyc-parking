@@ -9,4 +9,11 @@ import parser
 
 trips = parser.generateTrips("output.csv", 1, 0.02)
 
-print(trips)
+for hour in range(24):
+    hourTrips = trips[trips[:,0] == hour]
+    for minute in range(60):
+        tripsToStart = hourTrips[hourTrips[:,1] == minute]
+        print(tripsToStart)
+        
+
+
