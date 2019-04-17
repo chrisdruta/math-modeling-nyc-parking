@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
-from collections import deque
 
-def readZoneMap():
+def readZoneIdMap():
     zoneData = pd.read_csv("zone_lookup.csv").values
     zoneMap = {}
 
@@ -19,7 +18,7 @@ def parse(filenameList):
     for filename in filenameList:
         data = pd.read_csv(filename).values
 
-        #parsed = [ [ row[1][11:], row[2][11:], row[7], row[8] ] for row in data ]
+        # Format: [start hour, start minute, pickup zone id, dropoff zone id]
         parsed = [ [int(row[1][11:13]), int(row[1][14:16]), row[7], row[8]] for row in data if row[7] != row[8]]
 
         # Appends to output.csv

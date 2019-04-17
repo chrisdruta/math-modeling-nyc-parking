@@ -1,7 +1,7 @@
 
 import parser
 
-zoneMap = parser.readZoneMap()
+zoneMap = parser.readZoneIdMap()
 
 class Vehicle():
 
@@ -20,11 +20,6 @@ class VehicleController():
 
         for i in range(self.fleetSize):
             pass
-    
-    @property
-    def availableVehicles(self):
-
-        pass
 
     def updateVehicles(self):
         pass
