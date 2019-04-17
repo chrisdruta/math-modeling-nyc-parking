@@ -2,6 +2,15 @@ import pandas as pd
 import numpy as np
 
 def readZoneIdMap():
+    """
+    Reads in csv and returns a map: zoneId -> location name
+
+    Args:
+        None
+    
+    Returns:
+        zoneMap: dictionary containing (zoneId, location name string) pairs
+    """
     zoneData = pd.read_csv("taxi_zones/zone_lookup.csv").values
     zoneMap = {}
 
@@ -11,7 +20,16 @@ def readZoneIdMap():
     return zoneMap
 
 def parse(filenameList):
+    """
+    Parses through given filename list to generate one output csv
+    for all useful data from all datasets
 
+    Args:
+        filenameList: list of strings containing file names to parse
+
+    Returns:
+        Nothing, clears and writes new 'output.csv' in root dir
+    """
     # Clear output.csv
     open('output.csv', 'w').close()
 
