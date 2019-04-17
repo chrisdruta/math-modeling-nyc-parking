@@ -33,14 +33,12 @@ print(f"Number of trips: {len(trips)}")
 # Iniate SAVs
 # What is the fleet size we should use?
 n = 500
-# Where will they initially be placed?
-#   Maybe initialize them in zones from distribution created from all data
 controller = VehicleController(n, zoneDist)
 
 zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
 
 # Initial distribution of vehicles
-colors = {k: 0 for k in range(1,len(zoneMap) + 1)}
+colors = {k: 0 for k in range(1, zoneMap.shape[0] + 1)}
 for vehicle in controller.allVehicles:
     colors[vehicle.currentZone] += 1
 

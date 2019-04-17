@@ -37,7 +37,7 @@ def parse(filenameList):
         data = pd.read_csv(filename).values
 
         # Format: [start hour, start minute, pickup zone id, dropoff zone id]
-        parsed = [ [int(row[1][11:13]), int(row[1][14:16]), row[7], row[8]] for row in data if row[7] != row[8]]
+        parsed = [ [int(row[1][11:13]), int(row[1][14:16]), row[7], row[8]] for row in data if row[7] != row[8] and row[7] != 264 and row[8] != 264 and row[7] != 265 and row[8] != 265 ]
 
         # Appends to output.csv
         pd.DataFrame(parsed).to_csv("output.csv", index=False, header=False, mode='a')
