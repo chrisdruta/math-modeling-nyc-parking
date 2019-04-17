@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-
 import pandas as pd
 import numpy as np
 
 import parser
+from vehicle import VehicleController
 
-zoneMap = parser.readZoneMap()
+zoneIdMap = parser.readZoneIdMap()
 
 # Initate trips
 trips = parser.generateTrips("output.csv", 1, 0.02)
@@ -13,8 +13,10 @@ print(f"Number of trips: {len(trips)}")
 
 # Iniate SAVs
 # What is the fleet size we should use?
+n = 500
 # Where will they initially be placed?
 #   Maybe initialize them in zones from distribution created from all data
+controller = VehicleController(n)
 
 for hour in range(24):
     hourTrips = trips[trips[:,0] == hour]
