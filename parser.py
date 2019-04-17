@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 def readZoneIdMap():
-    zoneData = pd.read_csv("zone_lookup.csv").values
+    zoneData = pd.read_csv("taxi_zones/zone_lookup.csv").values
     zoneMap = {}
 
     for zone in zoneData:
@@ -24,9 +24,9 @@ def parse(filenameList):
         # Appends to output.csv
         pd.DataFrame(parsed).to_csv("output.csv", index=False, header=False, mode='a')
 
-def generateTrips(filename, numDataSets, percentUsing):
+def generateTripsAndZoneDist(filename, numDataSets, percentUsing):
     """
-    Samples a parsed csv with respect to it's time distriubtion 
+    Samples a parsed csv to generate trips for simulation day and the zone distribution
 
     Args:
         filename: name of file to sample from (should be output of parse func above)
@@ -35,18 +35,24 @@ def generateTrips(filename, numDataSets, percentUsing):
 
     Returns:
         trips: numpy array containing samples
+        zoneDistribution: dictionary containing (zoneId, pmfVal) pairs describing city
     """
 
     data = pd.read_csv(filename).values
+    zoneData = pd.read_csv("taxi_zones/zone_lookup.csv").values
 
-    # Making time distribution
+    # Making time distribution and zone distributions
     timeDistribution = np.zeros(24)
+    zoneDistribution = {k: 0 for k in range(1,zoneData[-1][0] + 1)}
     for d in data:
         timeDistribution[d[0]] += 1
+        zoneDistribution[d[2]] += 1
 
     total = len(data)
     for i in range(24):
         timeDistribution[i] /= total
+    for i in range(1,zoneData[-1][0] + 1):
+        zoneDistribution[i] /= total
 
     # n = number of data points divided by (30 * number of datasets) * 0.02 (2% of population uses it)
     n = int(len(data) / (30 * numDataSets) * percentUsing)
@@ -60,4 +66,4 @@ def generateTrips(filename, numDataSets, percentUsing):
         indices = np.random.choice(len(data[data[:, 0] == time]), size=len(sample[sample == time]))
         trips.extend(data[data[:, 0] == time][indices])
 
-    return np.array(trips)
+    return np.array(trips), zoneDistribution

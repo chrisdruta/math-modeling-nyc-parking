@@ -21,31 +21,35 @@ def plot(geopandaMap):
     """
     fig, ax = plt.subplots()
     ax.set_aspect('equal')
-    plot_polygon_collection(ax, geopandaMap['geometry'], geopandaMap['parking_demand'], vmin=0, vmax=1)
+    plot_polygon_collection(ax, geopandaMap['geometry'], geopandaMap['parking_demand'])
     plt.axis('off')
 
 zoneIdMap = parser.readZoneIdMap()
 
 # Initate trips
-#trips = parser.generateTrips("output.csv", 1, 0.02)
-#print(f"Number of trips: {len(trips)}")
+trips, zoneDist = parser.generateTripsAndZoneDist("output.csv", 1, 0.02)
+print(f"Number of trips: {len(trips)}")
 
 # Iniate SAVs
 # What is the fleet size we should use?
 n = 500
 # Where will they initially be placed?
 #   Maybe initialize them in zones from distribution created from all data
-controller = VehicleController(n)
+controller = VehicleController(n, zoneDist)
 
 zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
 
-colors = np.arange(0, 1, 1/len(zoneMap))
-zoneMap['parking_demand'] = colors
+# Initial distribution of vehicles
+colors = {k: 0 for k in range(1,len(zoneMap) + 1)}
+for vehicle in controller.allVehicles:
+    colors[vehicle.currentZone] += 1
 
+zoneMap['parking_demand'] = list(colors.values())
 plot(zoneMap)
 
 plt.show()
 quit()
+
 for hour in range(24):
     hourTrips = trips[trips[:,0] == hour]
 
