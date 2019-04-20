@@ -33,6 +33,8 @@ class VehicleController:
         self.parkedVehicles = []
         self.drivingVehicles = []
 
+        self.highPriorityTrips = []
+
         # Give all parked vehicles initial positions
         sample = np.random.choice(list(self.zoneDist.keys()),
                                     size=self.fleetSize,
@@ -54,24 +56,35 @@ class VehicleController:
 
         googleMapsBuffer = []
      
-        for trip in trips:
+        if len(self.highPriorityTrips) == 0:
+            tripsToLoop = trips
+        else:
+            try:
+                #tripsToLoop = np.concatenate(np.array(self.highPriorityTrips), trips, axis=0)
+                tripsToLoop = self.highPriorityTrips + trips.tolist()
+            except Exception as err:
+                print(err)
+                quit()
+
+        for trip in tripsToLoop:
             # Find nearest available SAV
             bestDistance = 100000
             bestSav = None
+
             for sav in self.availableVehicles:
                 timeInTrip = (t[0] - sav.tripStartHour, t[1] - sav.tripStartMinute)
                 distance = self.zoneCentroids[sav.getCurrentZone(timeInTrip)].distance(self.zoneCentroids[trip[2]])
-                # TODO: Handle scenerio where sav current zone = trip pick up zone
-                # Idea: Center -> edge distance time map
                 if distance < bestDistance:
                     bestDistance = distance
                     bestSav = sav
 
             if bestSav == None:
-                #print("Matching center didn't match trip with vehicle")
+                # TODO: THIS IS BROKEN!
+                print(type(trip))
+                print(type(self.highPriorityTrips))
+                if [trip] in self.highPriorityTrips:
+                    self.highPriorityTrips.append([trip])
                 continue
-                #raise RuntimeError("Matching center didn't match trip with vehicle")
-                # TODO: Actually handle this scenerio => doublecheck
 
             # Updated matched sav
             bestSav.nextZone = trip[3]
@@ -92,6 +105,9 @@ class VehicleController:
                 self.roamingVehicles.remove(bestSav)
             except:
                 self.parkedVehicles.remove(bestSav)
+
+            if trip in self.highPriorityTrips:
+                self.highPriorityTrips.remove(trip)
 
         # Construct 1 api request (destination matrix) to google maps
         for sav in googleMapsBuffer:

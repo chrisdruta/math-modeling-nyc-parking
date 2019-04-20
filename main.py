@@ -54,6 +54,7 @@ for hour in range(24):
 
         tripsToStart = hourTrips[hourTrips[:,1] == minute]
         controller.matchVehicles(tripsToStart, (hour, minute))
+        print(len(controller.highPriorityTrips))
 
         # Check if any trips were completed and add SAVs back to available SAVs with new location
 
