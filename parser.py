@@ -1,23 +1,6 @@
 import pandas as pd
 import numpy as np
-
-def readZoneIdMap():
-    """
-    Reads in csv and returns a map: zoneId -> location name
-
-    Args:
-        None
-    
-    Returns:
-        zoneMap: dictionary containing (zoneId, location name string) pairs
-    """
-    zoneData = pd.read_csv("taxi_zones/zone_lookup.csv").values
-    zoneMap = {}
-
-    for zone in zoneData:
-        zoneMap[zone[0]] = f"{zone[2]}, {zone[1]}"
-    
-    return zoneMap
+from shapely.geometry import MultiPoint
 
 def parse(filenameList):
     """
@@ -85,3 +68,45 @@ def generateTripsAndZoneDist(filename, numDataSets, percentUsing):
         trips.extend(data[data[:, 0] == time][indices])
 
     return np.array(trips), zoneDistribution
+
+def readZoneIdMap():
+    """
+    Reads in csv and returns a map: zoneId -> location name
+
+    Args:
+        None
+    
+    Returns:
+        zoneMap: dictionary containing (zoneId, location name string) pairs
+    """
+    zoneData = pd.read_csv("taxi_zones/zone_lookup.csv").values
+    zoneMap = {}
+
+    for zone in zoneData:
+        zoneMap[zone[0]] = f"{zone[2]}, {zone[1]}"
+    
+    return zoneMap
+
+def readZoneRadiusMap(zoneMap):
+    """
+    Reads in given geogreophy data to calculate avg radius of each zone in milesa
+
+    Args:
+        zoneMap: Geopandas dataframe that contains zone data
+
+    Returns:
+        zoneRadiusMap: Dictionary containing the average radius in miles for each zone
+    """
+    centroids = zoneMap.centroid
+    hulls = zoneMap.convex_hull
+    zoneRadiusMap = {}
+    for i in range(len(centroids)):
+        corners = MultiPoint(hulls[i].exterior.coords)
+        center = centroids[i]
+        distSum = sum(np.sqrt((center.x - corner.x)**2 + (center.y - corner.y)**2) for corner in corners)
+
+        # Average distance to centroid = (meters) / 1000 (meters) * Km -> Mile Factor
+        zoneRadiusMap[i + 1] = distSum/len(corners) / 1000 * 0.621371 
+
+    return zoneRadiusMap
+    

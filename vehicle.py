@@ -5,8 +5,7 @@ import parser
 
 zoneMap = parser.readZoneIdMap()
 
-class Vehicle():
-
+class Vehicle:
     def __init__(self, zoneId):
         self.currentZone = zoneId
         self.nextZone = 0
@@ -21,13 +20,13 @@ class Vehicle():
         else:
             return -1 # From google maps route, convert long lat to zone id on map w/ geopanda
 
-class VehicleController():
-
+class VehicleController:
     def __init__(self, n, zoneDist, zoneMap):
         self.fleetSize = n
         self.zoneDist = zoneDist
         self.zoneMap = zoneMap
         self.zoneCentroids = {(i + 1): p for i, p in enumerate(zoneMap['geometry'].centroid)}
+        self.zoneRadiusMap = parser.readZoneRadiusMap(self.zoneMap)
 
         self.roamingVehicles = []
         self.parkedVehicles = []
@@ -60,6 +59,7 @@ class VehicleController():
                 timeInTrip = (t[0] - sav.tripStartHour, t[1] - sav.tripStartMinute)
                 distance = self.zoneCentroids[sav.getCurrentZone(timeInTrip)].distance(self.zoneCentroids[trip[2]])
                 # TODO: Handle scenerio where sav current zone = trip pick up zone
+                # Idea: Center -> edge distance time map
                 if distance < bestDistance:
                     bestDistance = distance
                     bestSav = sav

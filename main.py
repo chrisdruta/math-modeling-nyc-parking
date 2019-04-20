@@ -21,17 +21,17 @@ def plot(geopandaMap):
     """
     fig, ax = plt.subplots()
     ax.set_aspect('equal')
+    plt.hold(True)
     plot_polygon_collection(ax, geopandaMap.geometry, geopandaMap['parking_demand'])
     plt.axis('off')
 
+# Read in nyc zone map
 zoneIdMap = parser.readZoneIdMap()
+zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
 
 print("Generating trips...")
 trips, zoneDist = parser.generateTripsAndZoneDist("output.csv", 1, 0.02)
 print(f"Number of trips: {len(trips)}")
-
-# Read in nyc zone map
-zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
 
 # Initate SAVs
 # What is the fleet size we should use?
