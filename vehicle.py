@@ -49,8 +49,12 @@ class VehicleController:
     def availableVehicles(self):
         return self.roamingVehicles + self.parkedVehicles
 
-    def updateVehicles(self):
-        pass
+    def updateVehicles(self, t):
+        for vehicle in self.drivingVehicles:
+            if vehicle.tripStartHour - t[0] == 0 and vehicle.tripStartMinute - t[1] == 0:
+                # SAV's trip is complete, either go on to the next trip saved in vehicle or roam
+                # TODO: Finish
+                pass
 
     def matchVehicles(self, trips, t):
 
