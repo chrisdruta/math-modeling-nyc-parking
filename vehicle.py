@@ -7,6 +7,7 @@ import pyproj
 from shapely.geometry import Point
 
 import parser
+from mock_client import MockClient
 
 # Setting up coordinate transformer
 _zoneIdMap = parser.readZoneIdMap()
@@ -14,59 +15,9 @@ _zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
 _zoneCentroids = {(i + 1): p for i, p in enumerate(_zoneMap['geometry'].centroid)}
 _zoneRadiusMap = parser.readZoneRadiusMap(_zoneMap)
 
-_zoneMapCrs = pyproj.from_user_input(_zoneMap.crs)
+_zoneMapCrs = pyproj.CRS.from_user_input(_zoneMap.crs)
 _geodeticCrs = _zoneMapCrs.to_geodetic()
-transformer = pyproj.Transformer.from_crs(_zoneMapCrs)
-
-class mockClient:
-
-    def __init__(self):
-        self.directionCount = 0
-        self.distanceCount = 0
-    
-    def directions(self, origin, destination):
-        self.directionCount += 1
-        
-        return {
-            'routes': [
-                {
-                    'legs': [
-                        {
-                            'duration': {
-                                'value': 900
-                            },
-                            'steps': [
-                                {
-                                    'duration': {
-                                        'value': 90
-                                    },
-                                    'end_location': {
-                                        'lat': 69,
-                                        'lng': 69
-                                    }
-                                }
-                            ] * 10
-                        }
-                    ]
-                }
-            ]
-        }
-
-    def distance_matrix(self, origins, destinations):
-        self.distanceCount += 1
-        return {
-            'rows': [
-                {
-                    'elements': [
-                        {
-                            'duration':{
-                                'value': 900
-                            }
-                        }
-                    ]
-                }
-            ] * len(origins)
-        }
+transformer = pyproj.Transformer.from_crs(_geodeticCrs, _zoneMapCrs)
 
 class Vehicle:
     def __init__(self, zoneId):
@@ -85,14 +36,16 @@ class Vehicle:
             return self.currentZone
         else:
             # From google maps route, convert long lat to zone id on map w/ geopanda
+            # TODO: Speed this up - giving a big slow down
             timeGoal = sum(step[0] for step in self.route) - self.travelTimeRemaining
             timeSum = 0
             bestDistance = 100000
             bestId = None
-            for step in route:
+            for step in self.route:
                 timeSum += step[0]
                 if timeSum >= timeGoal:
                     x, y = transformer.transform(step[1][0], step[1][1])
+                    #print(f"Transformed coords: {x},{y}")
                     for zoneId, point in _zoneCentroids.items():
                         distance = point.distance(Point(x, y))
                         if  distance < bestDistance:
@@ -110,7 +63,7 @@ class Vehicle:
         else:
             timeGoal = sum(step[0] for step in self.route) - self.travelTimeRemaining
             timeSum = 0
-            for step in route:
+            for step in self.route:
                 timeSum += step[0]
                 if timeSum >= timeGoal:
                     # Format: "lat,long"
@@ -128,8 +81,8 @@ class VehicleController:
 
         self.highPriorityTrips = []
 
-        #self.gmapsClient = googlemaps.Client(key='Add Your Key here')
-        self.gmapsClient = mockClient()
+        # TODO: self.gmapsClient = googlemaps.Client(key='Add Your Key here')
+        self.gmapsClient = MockClient()
 
         # Give all parked vehicles initial positions
         sample = np.random.choice(list(self.zoneDist.keys()),
@@ -183,8 +136,8 @@ class VehicleController:
                     
                     steps = []
                     for step in response['routes'][0]['legs'][0]['steps']:
-                        lat = steps['end_location']['lat']
-                        lng = steps['end_location']['lng']
+                        lat = step['end_location']['lat']
+                        lng = step['end_location']['lng']
                         steps.append((math.ceil(step['duration']['value']/60), (lat, lng)))
 
                     # NOTE: There is a premium api for 'duration_in_traffic'
