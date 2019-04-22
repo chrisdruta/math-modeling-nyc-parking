@@ -5,6 +5,7 @@ import googlemaps
 import geopandas
 import pyproj
 from shapely.geometry import Point
+from shapely.ops import nearest_points
 
 import parser
 from mock_client import MockClient
@@ -12,12 +13,22 @@ from mock_client import MockClient
 # Setting up coordinate transformer
 _zoneIdMap = parser.readZoneIdMap()
 _zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
-_zoneCentroids = {(i + 1): p for i, p in enumerate(_zoneMap['geometry'].centroid)}
 _zoneRadiusMap = parser.readZoneRadiusMap(_zoneMap)
+_zoneCentroids = _zoneMap.geometry.centroid
+_zoneCentroidsUnion = _zoneCentroids.unary_union
+_zoneCentroidsMap = {(i + 1): p for i, p in enumerate(_zoneCentroids)}
+_zoneCentroidsInverseMap = {(v.x, v.y):k for k, v in _zoneCentroidsMap.items()}
 
 _zoneMapCrs = pyproj.CRS.from_user_input(_zoneMap.crs)
 _geodeticCrs = _zoneMapCrs.to_geodetic()
 transformer = pyproj.Transformer.from_crs(_geodeticCrs, _zoneMapCrs)
+
+from datetime import datetime
+
+def near(point):
+    # find the nearest point and return the corresponding Place value
+    nearest = nearest_points(point, _zoneCentroidsUnion)[1]
+    return _zoneCentroidsInverseMap[(nearest.x, nearest.y)]
 
 class Vehicle:
     def __init__(self, zoneId):
@@ -39,23 +50,14 @@ class Vehicle:
             # TODO: Speed this up - giving a big slow down
             timeGoal = sum(step[0] for step in self.route) - self.travelTimeRemaining
             timeSum = 0
-            bestDistance = 100000
-            bestId = None
             for step in self.route:
                 timeSum += step[0]
                 if timeSum >= timeGoal:
                     x, y = transformer.transform(step[1][0], step[1][1])
                     #print(f"Transformed coords: {x},{y}")
-                    for zoneId, point in _zoneCentroids.items():
-                        distance = point.distance(Point(x, y))
-                        if  distance < bestDistance:
-                            bestDistance = distance
-                            bestId = zoneId
-                    break
-            if bestId != None:
-                return bestId
-            else:
-                raise RuntimeError("Route crawl failed to transform lat lng to zone id")
+                    return near(Point(x, y))
+
+            raise RuntimeError("Route crawl failed")
 
     def getCurrentBestLocationForAPI(self):
         if self.route is None:
@@ -169,7 +171,7 @@ class VehicleController:
             bestDistance = 100000
             bestSav = None
             for sav in self.roamingVehicles + self.parkedVehicles:
-                distance = _zoneCentroids[sav.getCurrentZone()].distance(_zoneCentroids[trip[2]])
+                distance = _zoneCentroidsMap[sav.getCurrentZone()].distance(_zoneCentroidsMap[trip[2]])
                 if distance < bestDistance:
                     bestDistance = distance
                     bestSav = sav
