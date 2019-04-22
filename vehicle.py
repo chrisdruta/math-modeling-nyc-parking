@@ -1,11 +1,22 @@
 import math
 import numpy as np
 
+import googlemaps
+import geopandas
+import pyproj
+from shapely.geometry import Point
+
 import parser
 
-import googlemaps
+# Setting up coordinate transformer
+_zoneIdMap = parser.readZoneIdMap()
+_zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
+_zoneCentroids = {(i + 1): p for i, p in enumerate(_zoneMap['geometry'].centroid)}
+_zoneRadiusMap = parser.readZoneRadiusMap(_zoneMap)
 
-zoneIdMap = parser.readZoneIdMap()
+_zoneMapCrs = pyproj.from_user_input(_zoneMap.crs)
+_geodeticCrs = _zoneMapCrs.to_geodetic()
+transformer = pyproj.Transformer.from_crs(_zoneMapCrs)
 
 class mockClient:
 
@@ -15,7 +26,31 @@ class mockClient:
     
     def directions(self, origin, destination):
         self.directionCount += 1
-        return (15, [1])
+        
+        return {
+            'routes': [
+                {
+                    'legs': [
+                        {
+                            'duration': {
+                                'value': 900
+                            },
+                            'steps': [
+                                {
+                                    'duration': {
+                                        'value': 90
+                                    },
+                                    'end_location': {
+                                        'lat': 69,
+                                        'lng': 69
+                                    }
+                                }
+                            ] * 10
+                        }
+                    ]
+                }
+            ]
+        }
 
     def distance_matrix(self, origins, destinations):
         self.distanceCount += 1
@@ -33,7 +68,6 @@ class mockClient:
             ] * len(origins)
         }
 
-
 class Vehicle:
     def __init__(self, zoneId):
         self.currentZone = zoneId
@@ -41,26 +75,52 @@ class Vehicle:
         self.nextZone = None
         self.travelTimeRemaining = 0 # in minutes
         self.nextTravelTimeRemaining = 0
-        self.route = []
+        self.route = None
 
     def __str__(self):
         return f"Id: {hex(id(self))}, Curr Zone: {self.currentZone}, Travel Zone: {self.travelZone}, Next Zone: {self.nextZone}, Travel Time Remaining: {self.travelTimeRemaining}"
     
     def getCurrentZone(self):
-        # if route length is 0, has no route => is parked
-        if len(self.route) == 0:
+        if self.route is None:
             return self.currentZone
         else:
             # From google maps route, convert long lat to zone id on map w/ geopanda
-            return 50
+            timeGoal = sum(step[0] for step in self.route) - self.travelTimeRemaining
+            timeSum = 0
+            bestDistance = 100000
+            bestId = None
+            for step in route:
+                timeSum += step[0]
+                if timeSum >= timeGoal:
+                    x, y = transformer.transform(step[1][0], step[1][1])
+                    for zoneId, point in _zoneCentroids.items():
+                        distance = point.distance(Point(x, y))
+                        if  distance < bestDistance:
+                            bestDistance = distance
+                            bestId = zoneId
+                    break
+            if bestId != None:
+                return bestId
+            else:
+                raise RuntimeError("Route crawl failed to transform lat lng to zone id")
+
+    def getCurrentBestLocationForAPI(self):
+        if self.route is None:
+            return _zoneIdMap[self.currentZone]
+        else:
+            timeGoal = sum(step[0] for step in self.route) - self.travelTimeRemaining
+            timeSum = 0
+            for step in route:
+                timeSum += step[0]
+                if timeSum >= timeGoal:
+                    # Format: "lat,long"
+                    return f"{step[1][0]},{step[1][1]}"
+            raise RuntimeError("Route crawl failed for best location")
 
 class VehicleController:
-    def __init__(self, n, zoneDist, zoneMap):
+    def __init__(self, n, zoneDist):
         self.fleetSize = n
         self.zoneDist = zoneDist
-        self.zoneMap = zoneMap
-        self.zoneCentroids = {(i + 1): p for i, p in enumerate(zoneMap['geometry'].centroid)}
-        self.zoneRadiusMap = parser.readZoneRadiusMap(self.zoneMap)
 
         self.roamingVehicles = []
         self.parkedVehicles = []
@@ -83,11 +143,14 @@ class VehicleController:
         for vehicle in self.roamingVehicles:
             vehicle.travelTimeRemaining -= 1
 
-            if vehicle.travelTimeRemaining <= 0:
+            if vehicle.travelTimeRemaining < 0:
+                raise RuntimeError("Not suposed to happen")
+
+            if vehicle.travelTimeRemaining == 0:
                 vehicle.currentZone = vehicle.travelZone
                 vehicle.travelZone = None
                 vehicle.nextZone = None
-                vehicle.route = []
+                vehicle.route = None
 
                 #print("Vehicle stopped roaming")
                 self.roamingVehicles.remove(vehicle)
@@ -115,10 +178,20 @@ class VehicleController:
                     vehicle.nextZone = None
 
                     # Get new travel time + route
-                    response = self.gmapsClient.directions(zoneIdMap[vehicle.currentZone], zoneIdMap[vehicle.travelZone])
-                    vehicle.travelTimeRemaining = response[0]
-                    vehicle.route = response[1]
+                    response = self.gmapsClient.directions(_zoneIdMap[vehicle.currentZone],
+                                                            _zoneIdMap[vehicle.travelZone])
                     
+                    steps = []
+                    for step in response['routes'][0]['legs'][0]['steps']:
+                        lat = steps['end_location']['lat']
+                        lng = steps['end_location']['lng']
+                        steps.append((math.ceil(step['duration']['value']/60), (lat, lng)))
+
+                    # NOTE: There is a premium api for 'duration_in_traffic'
+                    duration = math.ceil(response['routes'][0]['legs'][0]['duration']['value'] / 60)
+
+                    vehicle.route = steps
+                    vehicle.travelTimeRemaining = duration
                     vehicle.nextTravelTimeRemaining = 0
 
                     #print(f"Client dropped off, roaming: {vehicle}")
@@ -131,7 +204,6 @@ class VehicleController:
         googleMapsApiBuffer = []
         roamingBuffer = []
      
-        #tripsToLoop = np.concatenate(np.array(self.highPriorityTrips), trips, axis=0)
         tripsToMatch = self.highPriorityTrips + trips.tolist()
 
         for trip in tripsToMatch:
@@ -144,7 +216,7 @@ class VehicleController:
             bestDistance = 100000
             bestSav = None
             for sav in self.roamingVehicles + self.parkedVehicles:
-                distance = self.zoneCentroids[sav.getCurrentZone()].distance(self.zoneCentroids[trip[2]])
+                distance = _zoneCentroids[sav.getCurrentZone()].distance(_zoneCentroids[trip[2]])
                 if distance < bestDistance:
                     bestDistance = distance
                     bestSav = sav
@@ -157,7 +229,7 @@ class VehicleController:
             # If in same zone already, set travelTimeRemaining now and ignore later
             if bestDistance == 0:
                 # randomly sample average centroid radius to get estimated pick up time, 17.6 is avg mph for NYC
-                bestSav.travelTimeRemaining = math.ceil(np.random.uniform() * self.zoneRadiusMap[trip[2]] / 17.6 * 60)
+                bestSav.travelTimeRemaining = math.ceil(np.random.uniform() * _zoneRadiusMap[trip[2]] / 17.6 * 60)
           
             # Set next zone to trip's destination
             bestSav.travelZone = trip[2]
@@ -187,18 +259,13 @@ class VehicleController:
 
         # get current -> travel times
         for sav in googleMapsApiBuffer:
-            if sav not in roamingBuffer:
-                origins.append(zoneIdMap[sav.currentZone])
-            else:
-                lon, lat = 69, 69 # TODO: Get actual long lat coords from sav route
-                origins.append(f"{lon},{lat}")
-
-            destinations.append(zoneIdMap[sav.travelZone])
+            origins.append(sav.getCurrentBestLocationForAPI())
+            destinations.append(_zoneIdMap[sav.travelZone])
             
         # get travel -> next times
         for sav in googleMapsApiBuffer:
-            origins.append(zoneIdMap[sav.travelZone])
-            destinations.append(zoneIdMap[sav.nextZone])
+            origins.append(_zoneIdMap[sav.travelZone])
+            destinations.append(_zoneIdMap[sav.nextZone])
 
         # Send and await response
         response = self.gmapsClient.distance_matrix(origins, destinations)
@@ -206,9 +273,9 @@ class VehicleController:
 
         # First half of response is current -> travel
         for sav, resp in zip(googleMapsApiBuffer, response[:int(len(response)/ 2)]):
-            if sav.travelTimeRemaining <= 0:
-                sav.travelTimeRemaining = int(resp['elements'][0]['duration']['value'] / 60)
+            if sav.travelTimeRemaining == 0:
+                sav.travelTimeRemaining = math.ceil(resp['elements'][0]['duration']['value'] / 60)
 
         # Second half is travel -> next
         for sav, resp in zip(googleMapsApiBuffer, response[int(len(response)/ 2):]):
-            sav.nextTravelTimeRemaining = int(resp['elements'][0]['duration']['value'] / 60)
+            sav.nextTravelTimeRemaining = math.ceil(resp['elements'][0]['duration']['value'] / 60)

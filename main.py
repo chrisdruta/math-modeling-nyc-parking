@@ -36,7 +36,7 @@ print(f"Number of trips: {len(trips)}")
 # Initate SAVs
 # What is the fleet size we should use?
 n = 500
-controller = VehicleController(n, zoneDist, zoneMap)
+controller = VehicleController(n, zoneDist)
 print("Finished setting up model controller")
 
 # Initial distribution of vehicles
@@ -65,6 +65,7 @@ print(f"Availible vehicles: {len(controller.parkedVehicles + controller.roamingV
 print(f"Traveling vehicles: {len(controller.travelingVehicles)}")
 print(f"Google Maps Directions API Calls: {controller.gmapsClient.directionCount}")
 print(f"Google Maps Destination Matrix API Calls: {controller.gmapsClient.distanceCount}")
+print(f" => Total API Calls: {controller.gmapsClient.directionCount + controller.gmapsClient.distanceCount}")
 
 printDebug = False
 if (printDebug):
