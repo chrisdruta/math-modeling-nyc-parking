@@ -7,6 +7,9 @@ import pyproj
 from shapely.geometry import Point
 from shapely.ops import nearest_points
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
 import parser
 from mock_client import MockClient
 
@@ -40,7 +43,8 @@ class Vehicle:
         self.route = None
 
     def __str__(self):
-        return f"Id: {hex(id(self))}, Curr Zone: {self.currentZone}, Travel Zone: {self.travelZone}, Next Zone: {self.nextZone}, Travel Time Remaining: {self.travelTimeRemaining}"
+        return (f"Id: {hex(id(self))}, Curr Zone: {self.currentZone}, Travel Zone: {self.travelZone} " +
+                f"Next Zone: {self.nextZone}, Travel Time Remaining: {self.travelTimeRemaining}")
     
     def getCurrentZone(self):
         if self.route is None:
@@ -175,6 +179,7 @@ class VehicleController:
                 if distance < bestDistance:
                     bestDistance = distance
                     bestSav = sav
+                    if distance == 0: break
 
             if bestSav == None:
                 if trip not in self.highPriorityTrips:
@@ -183,8 +188,9 @@ class VehicleController:
 
             # If in same zone already, set travelTimeRemaining now and ignore later
             if bestDistance == 0:
-                # randomly sample average centroid radius to get estimated pick up time, 17.6 is avg mph for NYC
-                bestSav.travelTimeRemaining = math.ceil(np.random.uniform() * _zoneRadiusMap[trip[2]] / 17.6 * 60)
+                # sample average centroid radius to get estimated pick up time, 17.6 is avg mph for NYC
+                time = math.ceil(np.random.uniform() * _zoneRadiusMap[trip[2]] / 17.6 * 60)
+                bestSav.travelTimeRemaining = time
           
             # Set next zone to trip's destination
             bestSav.travelZone = trip[2]
