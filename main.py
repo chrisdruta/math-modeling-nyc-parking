@@ -51,10 +51,35 @@ for hour in range(24):
     hourTrips = trips[trips[:,0] == hour]
 
     for minute in range(60):
+        print(f"\nTime {hour}:{minute}")
         tripsToStart = hourTrips[hourTrips[:,1] == minute]
-        controller.matchVehicles(tripsToStart, (hour, minute))
+        controller.matchVehicles(tripsToStart)
         controller.updateVehicles()
-        print(len(controller.highPriorityTrips))
+        print(f"High priority trips: {len(controller.highPriorityTrips)}")
+        print(f"Roaming vehicles: {len(controller.roamingVehicles)}")
 
-print("END")
-print(len(controller.availableVehicles))
+print("\nEND\n")
+
+print(" -- Stats --")
+print(f"Availible vehicles: {len(controller.parkedVehicles + controller.roamingVehicles)}")
+print(f"Traveling vehicles: {len(controller.travelingVehicles)}")
+print(f"Google Maps Directions API Calls: {controller.gmapsClient.directionCount}")
+print(f"Google Maps Destination Matrix API Calls: {controller.gmapsClient.distanceCount}")
+
+printDebug = False
+if (printDebug):
+    print("\nDuplications Test")
+    test1 = len(set(controller.travelingVehicles))
+    test2 = len(controller.travelingVehicles)
+    print(test1)
+    print(test2)
+
+    print("\nTraveling in Roaming Test")
+    for sav in controller.travelingVehicles:
+        if sav in controller.roamingVehicles:
+            print("BAD")
+
+
+    print("\nFirst 10 traveling vehicles:")
+    for sav in controller.travelingVehicles[:10]:
+            print(sav)
