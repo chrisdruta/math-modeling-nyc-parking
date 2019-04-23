@@ -11,8 +11,8 @@
 Parameters - Fleet Size, Percent Utilization, Roaming Time
 
 Calculations:
-    Parking Demand (Maps)
-    Avg waiting time by region
-    Avg waiting time (axis = traffic %, fleet size)
+    Parking Demand (Maps) - Done
+    Avg waiting time by region - Done
+    Avg waiting time (axis = traffic %, fleet size) 
 
 Environmental Analysis?

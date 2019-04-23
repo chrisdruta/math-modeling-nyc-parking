@@ -42,6 +42,9 @@ class Vehicle:
         self.nextTravelTimeRemaining = 0
         self.route = None
 
+        # Simulation calculation parameter
+        self.totalTripWaitTime = []
+
     def __str__(self):
         return (f"Id: {hex(id(self))}, Curr Zone: {self.currentZone}, Travel Zone: {self.travelZone} " +
                 f"Next Zone: {self.nextZone}, Travel Time Remaining: {self.travelTimeRemaining}")
@@ -96,6 +99,10 @@ class VehicleController:
                                     p=list(self.zoneDist.values()))
         for i in range(self.fleetSize):
             self.parkedVehicles.append(Vehicle(sample[i]))
+
+    @property
+    def allVehicles(self):
+        return self.roamingVehicles + self.parkedVehicles + self.travelingVehicles
 
     def updateVehicles(self):
 
@@ -236,6 +243,7 @@ class VehicleController:
         for sav, resp in zip(googleMapsApiBuffer, response[:int(len(response)/ 2)]):
             if sav.travelTimeRemaining == 0:
                 sav.travelTimeRemaining = math.ceil(resp['elements'][0]['duration']['value'] / 60)
+                sav.totalTripWaitTime.append((int(sav.travelTimeRemaining), int(sav.travelZone)))
 
         # Second half is travel -> next
         for sav, resp in zip(googleMapsApiBuffer, response[int(len(response)/ 2):]):
