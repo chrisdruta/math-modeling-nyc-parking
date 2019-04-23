@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from scipy.stats import wilcoxon
 
 import googlemaps
 import geopandas
@@ -15,6 +16,7 @@ from mock_client import MockClient
 
 # Setting up coordinate transformer
 _zoneIdMap = parser.readZoneIdMap()
+_zoneKeyList = list(_zoneIdMap.keys())
 _zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
 _zoneRadiusMap = parser.readZoneRadiusMap(_zoneMap)
 _zoneCentroids = _zoneMap.geometry.centroid
@@ -54,7 +56,6 @@ class Vehicle:
             return self.currentZone
         else:
             # From google maps route, convert long lat to zone id on map w/ geopanda
-            # TODO: Speed this up - giving a big slow down
             timeGoal = sum(step[0] for step in self.route) - self.travelTimeRemaining
             timeSum = 0
             for step in self.route:
@@ -80,9 +81,13 @@ class Vehicle:
             raise RuntimeError("Route crawl failed for best location")
 
 class VehicleController:
-    def __init__(self, n, zoneDist):
+    def __init__(self, n, zoneDist, idealZoneDistVar):
         self.fleetSize = n
         self.zoneDist = zoneDist
+        self.zoneDistValsList = np.array(list(zoneDist.values()))
+        
+        self.idealZoneDistVar = idealZoneDistVar
+        self.maxVarDelta = 3
 
         self.roamingVehicles = []
         self.parkedVehicles = []
@@ -104,7 +109,24 @@ class VehicleController:
     def allVehicles(self):
         return self.roamingVehicles + self.parkedVehicles + self.travelingVehicles
 
-    def updateVehicles(self):
+    def getRoamZone(self, currVar, currZone):
+        
+        difference = np.abs(self.idealZoneDistVar - currVar)
+        
+        if difference > self.maxVarDelta:
+            # sample og dist
+            sample = np.random.choice(_zoneKeyList, p=self.zoneDistValsList)
+            while sample == currZone:
+                sample = np.random.choice(_zoneKeyList, p=self.zoneDistValsList)
+            return sample
+        else:
+            # random unif
+            sample = np.random.choice(_zoneKeyList)
+            while sample == currZone:
+                sample = np.random.choice(_zoneKeyList, p=self.zoneDistValsList)
+            return sample
+
+    def updateVehicles(self, currVar):
 
         for vehicle in self.roamingVehicles:
             vehicle.travelTimeRemaining -= 1
@@ -138,7 +160,7 @@ class VehicleController:
                 
                 # Case 2: Dropped off client, switching to roam
                 elif vehicle.nextZone == 0:
-                    randomZone = 50 # TODO: Pick this some how
+                    randomZone = self.getRoamZone(currVar, vehicle.travelZone)
                     vehicle.currentZone = vehicle.travelZone
                     vehicle.travelZone = randomZone
                     vehicle.nextZone = None
@@ -161,7 +183,6 @@ class VehicleController:
                     vehicle.nextTravelTimeRemaining = 0
 
                     #print(f"Client dropped off, roaming: {vehicle}")
-
                     self.travelingVehicles.remove(vehicle)
                     self.roamingVehicles.append(vehicle)
 
@@ -181,7 +202,7 @@ class VehicleController:
             # Find nearest available SAV
             bestDistance = 100000
             bestSav = None
-            for sav in self.roamingVehicles + self.parkedVehicles:
+            for sav in self.parkedVehicles:
                 distance = _zoneCentroidsMap[sav.getCurrentZone()].distance(_zoneCentroidsMap[trip[2]])
                 if distance < bestDistance:
                     bestDistance = distance

@@ -40,20 +40,17 @@ trips, zoneDist = parser.generateTripsAndZoneDist("output.csv", 1, 0.02)
 numTrips = len(trips)
 print(f"Number of trips: {numTrips}")
 
-# Initate SAVs
-# What is the fleet size we should use?
+# Initate controller
+idealZoneDistVar = np.var(list(zoneDist.values()))
 n = 500
-controller = VehicleController(n, zoneDist)
+controller = VehicleController(n, zoneDist, idealZoneDistVar)
 print("Finished setting up model controller")
 
 # Initial distribution of vehicles
 initialDist = {k: 0 for k in zoneIdMap.keys()}
-
 for vehicle in controller.parkedVehicles:
     initialDist[vehicle.currentZone] += 1
-
-maxVal = max(initialDist.values())
-print(maxVal)
+maxVal = np.max(list(initialDist.values()))
 zoneMap['initial_dist'] = [float(i)/maxVal for i in list(initialDist.values())]
 
 # Calculations
@@ -63,16 +60,30 @@ zoneAvgWait = {k: 0 for k in zoneIdMap.keys()}
 print("Starting simulation day")
 for hour in range(24):
     hourTrips = trips[trips[:,0] == hour]
-
     for minute in range(60):
+
         print(f"\nTime {hour}:{minute}")
+
         tripsToStart = hourTrips[hourTrips[:,1] == minute]
         controller.matchVehicles(tripsToStart)
-        controller.updateVehicles()
 
+        # Update parking demand
         for vehicle in controller.parkedVehicles:
             parkingDemand[vehicle.currentZone] += 1
 
+        # Calculate current vehicle distribution and variance
+        availibleVehicles = controller.roamingVehicles + controller.parkedVehicles
+        vehicleCountMap = {k: 0 for k in zoneIdMap.keys()}
+        for vehicle in availibleVehicles:
+            vehicleCountMap[vehicle.getCurrentZone()] += 1
+        currDist = np.array(list(vehicleCountMap.values())) / len(availibleVehicles)
+        currVar = np.var(currDist)
+
+        # Update all vehicles
+        controller.updateVehicles(currVar)
+
+        print(f"Current Zone Dist:\t Mean = {np.mean(currDist)}, Variance = {currVar}")
+        print(f"Absolute diff: {np.abs(idealZoneDistVar - currVar)}")
         print(f"High priority trips: {len(controller.highPriorityTrips)}")
         print(f"Roaming vehicles: {len(controller.roamingVehicles)}")
 
@@ -81,7 +92,9 @@ print("\nEND\n")
 zoneCentroids = zoneMap.geometry.centroid
 
 # Calculating parking demand map
-zoneMap['parking_demand'] = list(parkingDemand.values())
+parkingDemandValues = np.array(list(parkingDemand.values()))
+zoneMap['parking_demand'] = parkingDemandValues / np.max(parkingDemandValues)
+print(f"Zone with highest parking demand: {np.argmax(parkingDemandValues) + 1}")
 
 # Calculating per zone wait time
 for vehicle in controller.allVehicles:
@@ -89,11 +102,10 @@ for vehicle in controller.allVehicles:
         zoneAvgWait[zoneId] += waitTime * -1 / numTrips
 zoneMap['wait_time'] = list(zoneAvgWait.values())
 
-plot(zoneMap, 'wait_time', save=True)
-plt.show()
+plot(zoneMap, 'wait_time', title='Wait Time', save=False)
+plot(zoneMap, 'parking_demand', title='Parking Demand', save=False)
 
-#plot(zoneMap, 'parking_demand', title='Zone Average Parking Demand')
-#plt.plot(zoneCentroids[49].x, zoneCentroids[49].y, marker='o', markersize=3, color="red")
+plt.show()
 
 printStats = False
 if (printStats):
