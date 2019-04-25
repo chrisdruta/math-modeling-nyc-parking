@@ -43,7 +43,8 @@ print(f"Number of trips: {numTrips}")
 # Initate controller
 idealZoneDist = np.array(list(zoneDist.values()))
 n = 500
-controller = VehicleController(n, zoneDist)
+crit = 1.5
+controller = VehicleController(n, zoneDist, crit)
 print("Finished setting up model controller")
 
 # Initial distribution of vehicles
@@ -79,13 +80,13 @@ for hour in range(24):
         for vehicle in availibleVehicles:
             vehicleCountMap[vehicle.getCurrentZone()] += 1
         currDist = np.array(list(vehicleCountMap.values())) / len(availibleVehicles)
+
         bhatDistance = -1 * np.log(np.sum([np.sqrt(p * q) for p, q in zip(idealZoneDist, currDist)]))
-        if np.isposinf(bhatDistance): bhatDistance = 0
+        distGraph.append(bhatDistance)
         print(f"Bhattacharyya distance: {bhatDistance}")
 
         # Update all vehicles
         controller.updateVehicles(bhatDistance)
-        distGraph.append(bhatDistance)
 
         print(f"High priority trips: {len(controller.highPriorityTrips)}")
         print(f"Roaming vehicles: {len(controller.roamingVehicles)}")

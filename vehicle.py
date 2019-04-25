@@ -1,6 +1,5 @@
 import math
 import numpy as np
-from scipy.stats import wilcoxon
 
 import googlemaps
 import geopandas
@@ -28,13 +27,6 @@ _zoneMapCrs = pyproj.CRS.from_user_input(_zoneMap.crs)
 _geodeticCrs = _zoneMapCrs.to_geodetic()
 transformer = pyproj.Transformer.from_crs(_geodeticCrs, _zoneMapCrs)
 
-from datetime import datetime
-
-def near(point):
-    # find the nearest point and return the corresponding Place value
-    nearest = nearest_points(point, _zoneCentroidsUnion)[1]
-    return _zoneCentroidsInverseMap[(nearest.x, nearest.y)]
-
 class Vehicle:
     def __init__(self, zoneId):
         self.currentZone = zoneId
@@ -51,6 +43,11 @@ class Vehicle:
         return (f"Id: {hex(id(self))}, Curr Zone: {self.currentZone}, Travel Zone: {self.travelZone} " +
                 f"Next Zone: {self.nextZone}, Travel Time Remaining: {self.travelTimeRemaining}")
     
+    def near(self, point):
+        # find the nearest point and return the corresponding zone value
+        nearest = nearest_points(point, _zoneCentroidsUnion)[1]
+        return _zoneCentroidsInverseMap[(nearest.x, nearest.y)]
+
     def getCurrentZone(self):
         if self.route is None:
             return self.currentZone
@@ -63,7 +60,7 @@ class Vehicle:
                 if timeSum >= timeGoal:
                     x, y = transformer.transform(step[1][0], step[1][1])
                     #print(f"Transformed coords: {x},{y}")
-                    return near(Point(x, y))
+                    return self.near(Point(x, y))
 
             raise RuntimeError("Route crawl failed")
 
@@ -81,12 +78,12 @@ class Vehicle:
             raise RuntimeError("Route crawl failed for best location")
 
 class VehicleController:
-    def __init__(self, n, zoneDist):
+    def __init__(self, n, zoneDist, distanceTolerance):
         self.fleetSize = n
         self.zoneDist = zoneDist
         self.zoneDistValsList = np.array(list(zoneDist.values()))
         
-        self.maxVarDelta = 3
+        self.distanceTolerance = distanceTolerance
 
         self.roamingVehicles = []
         self.parkedVehicles = []
@@ -110,7 +107,7 @@ class VehicleController:
 
     def getRoamZone(self, bhatDistance, currZone):
         
-        if bhatDistance >= 1.5:
+        if bhatDistance >= self.distanceTolerance:
             # sample initital dist to force distribution towards there
             sample = np.random.choice(_zoneKeyList, p=self.zoneDistValsList)
             while sample == currZone:
