@@ -41,9 +41,9 @@ numTrips = len(trips)
 print(f"Number of trips: {numTrips}")
 
 # Initate controller
-idealZoneDistVar = np.var(list(zoneDist.values()))
+idealZoneDist = np.array(list(zoneDist.values()))
 n = 500
-controller = VehicleController(n, zoneDist, idealZoneDistVar)
+controller = VehicleController(n, zoneDist)
 print("Finished setting up model controller")
 
 # Initial distribution of vehicles
@@ -56,6 +56,8 @@ zoneMap['initial_dist'] = [float(i)/maxVal for i in list(initialDist.values())]
 # Calculations
 parkingDemand = {k: 0 for k in zoneIdMap.keys()}
 zoneAvgWait = {k: 0 for k in zoneIdMap.keys()}
+
+distGraph = []
 
 print("Starting simulation day")
 for hour in range(24):
@@ -77,17 +79,20 @@ for hour in range(24):
         for vehicle in availibleVehicles:
             vehicleCountMap[vehicle.getCurrentZone()] += 1
         currDist = np.array(list(vehicleCountMap.values())) / len(availibleVehicles)
-        currVar = np.var(currDist)
+        bhatDistance = -1 * np.log(np.sum([np.sqrt(p * q) for p, q in zip(idealZoneDist, currDist)]))
+        if np.isposinf(bhatDistance): bhatDistance = 0
+        print(f"Bhattacharyya distance: {bhatDistance}")
 
         # Update all vehicles
-        controller.updateVehicles(currVar)
+        controller.updateVehicles(bhatDistance)
+        distGraph.append(bhatDistance)
 
-        print(f"Current Zone Dist:\t Mean = {np.mean(currDist)}, Variance = {currVar}")
-        print(f"Absolute diff: {np.abs(idealZoneDistVar - currVar)}")
         print(f"High priority trips: {len(controller.highPriorityTrips)}")
         print(f"Roaming vehicles: {len(controller.roamingVehicles)}")
 
 print("\nEND\n")
+
+np.save('dist-graph', np.array(distGraph))
 
 zoneCentroids = zoneMap.geometry.centroid
 

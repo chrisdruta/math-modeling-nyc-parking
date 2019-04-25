@@ -81,12 +81,11 @@ class Vehicle:
             raise RuntimeError("Route crawl failed for best location")
 
 class VehicleController:
-    def __init__(self, n, zoneDist, idealZoneDistVar):
+    def __init__(self, n, zoneDist):
         self.fleetSize = n
         self.zoneDist = zoneDist
         self.zoneDistValsList = np.array(list(zoneDist.values()))
         
-        self.idealZoneDistVar = idealZoneDistVar
         self.maxVarDelta = 3
 
         self.roamingVehicles = []
@@ -109,30 +108,25 @@ class VehicleController:
     def allVehicles(self):
         return self.roamingVehicles + self.parkedVehicles + self.travelingVehicles
 
-    def getRoamZone(self, currVar, currZone):
+    def getRoamZone(self, bhatDistance, currZone):
         
-        difference = np.abs(self.idealZoneDistVar - currVar)
-        
-        if difference > self.maxVarDelta:
-            # sample og dist
+        if bhatDistance >= 1.5:
+            # sample initital dist to force distribution towards there
             sample = np.random.choice(_zoneKeyList, p=self.zoneDistValsList)
             while sample == currZone:
                 sample = np.random.choice(_zoneKeyList, p=self.zoneDistValsList)
             return sample
         else:
-            # random unif
+            # move randomly
             sample = np.random.choice(_zoneKeyList)
             while sample == currZone:
                 sample = np.random.choice(_zoneKeyList, p=self.zoneDistValsList)
             return sample
 
-    def updateVehicles(self, currVar):
+    def updateVehicles(self, bhatDist):
 
         for vehicle in self.roamingVehicles:
             vehicle.travelTimeRemaining -= 1
-
-            if vehicle.travelTimeRemaining < 0:
-                raise RuntimeError("Not suposed to happen")
 
             if vehicle.travelTimeRemaining == 0:
                 vehicle.currentZone = vehicle.travelZone
@@ -160,7 +154,7 @@ class VehicleController:
                 
                 # Case 2: Dropped off client, switching to roam
                 elif vehicle.nextZone == 0:
-                    randomZone = self.getRoamZone(currVar, vehicle.travelZone)
+                    randomZone = self.getRoamZone(bhatDist, vehicle.travelZone)
                     vehicle.currentZone = vehicle.travelZone
                     vehicle.travelZone = randomZone
                     vehicle.nextZone = None
@@ -202,7 +196,9 @@ class VehicleController:
             # Find nearest available SAV
             bestDistance = 100000
             bestSav = None
-            for sav in self.parkedVehicles:
+            # NOTE: Interesting results when switching park/roam match priority
+            #for sav in self.parkedVehicles + self.roamingVehicles:
+            for sav in self.roamingVehicles + self.parkedVehicles:
                 distance = _zoneCentroidsMap[sav.getCurrentZone()].distance(_zoneCentroidsMap[trip[2]])
                 if distance < bestDistance:
                     bestDistance = distance
@@ -211,6 +207,7 @@ class VehicleController:
 
             if bestSav == None:
                 if trip not in self.highPriorityTrips:
+                    print(f"high priority pickup:{trip[2]}, trip:{trip}")
                     self.highPriorityTrips.append(trip)
                 continue
 
