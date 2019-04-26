@@ -17,13 +17,13 @@ def parse(filenameList):
     open('output.csv', 'w').close()
 
     for filename in filenameList:
-        data = pd.read_csv(filename).values
+        data = pd.read_csv(f"./data/{filename}").values
 
         # Format: [start hour, start minute, pickup zone id, dropoff zone id]
         parsed = [ [int(row[1][11:13]), int(row[1][14:16]), row[7], row[8]] for row in data if row[7] != row[8] and row[7] != 264 and row[8] != 264 and row[7] != 265 and row[8] != 265 ]
 
         # Appends to output.csv
-        pd.DataFrame(parsed).to_csv("output.csv", index=False, header=False, mode='a')
+        pd.DataFrame(parsed).to_csv("./data/output.csv", index=False, header=False, mode='a')
 
 def generateTripsAndZoneDist(filename, numDataSets, percentUsing):
     """
@@ -110,3 +110,10 @@ def readZoneRadiusMap(zoneMap):
 
     return zoneRadiusMap
     
+# parse(['yellow_tripdata_2018-01.csv',
+#         'yellow_tripdata_2018-03.csv',
+#         'yellow_tripdata_2018-05.csv',
+#         'yellow_tripdata_2018-07.csv',
+#         'yellow_tripdata_2018-09.csv',
+#         'yellow_tripdata_2018-11.csv'
+#         ])

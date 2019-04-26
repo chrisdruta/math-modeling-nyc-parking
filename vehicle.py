@@ -96,7 +96,7 @@ class VehicleController:
 
         self.highPriorityTrips = []
 
-        mock = False
+        mock = True
         if mock is True:
             self.gmapsClient = MockClient()
         else:
@@ -152,7 +152,7 @@ class VehicleController:
         for vehicle in self.roamingVehicles:
             vehicle.travelTimeRemaining -= 1
 
-            if vehicle.travelTimeRemaining == 0:
+            if vehicle.travelTimeRemaining <= 0:
                 vehicle.currentZone = vehicle.travelZone
                 vehicle.travelZone = None
                 vehicle.nextZone = None

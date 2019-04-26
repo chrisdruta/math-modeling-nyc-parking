@@ -25,7 +25,7 @@ def plot(geopandaMap, plotAxis, title=None, save=False):
         ax.set_title(title)
     
     idk = plot_polygon_collection(ax, geopandaMap.geometry, geopandaMap[plotAxis], edgecolor='black')
-    plt.colorbar(ax=ax,mappable=idk)
+    plt.colorbar(cax=ax,mappable=idk)
     plt.axis('off')
 
     if save:
@@ -35,29 +35,33 @@ def plot(geopandaMap, plotAxis, title=None, save=False):
 zoneIdMap = parser.readZoneIdMap()
 zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
 
+# Set parameters
+n = 250
+p = 0.05
+numDataSets = 6
+crit = 1.5
+
 print("Generating trips...")
-trips, zoneDist = parser.generateTripsAndZoneDist("output.csv", 1, 0.02)
+trips, zoneDist = parser.generateTripsAndZoneDist("./data/output.csv", numDataSets, p)
 numTrips = len(trips)
 print(f"Number of trips: {numTrips}")
 
 # Initate controller
 idealZoneDist = np.array(list(zoneDist.values()))
-n = 250
-crit = 1.5
 controller = VehicleController(n, zoneDist, crit)
 print("Finished setting up model controller")
 
 # Initial distribution of vehicles
-initialDist = {k: 0 for k in zoneIdMap.keys()}
-for vehicle in controller.parkedVehicles:
-    initialDist[vehicle.currentZone] += 1
-maxVal = np.max(list(initialDist.values()))
-zoneMap['initial_dist'] = [float(i)/maxVal for i in list(initialDist.values())]
+if False:
+    initialDist = {k: 0 for k in zoneIdMap.keys()}
+    for vehicle in controller.parkedVehicles:
+        initialDist[vehicle.currentZone] += 1
+    maxVal = np.max(list(initialDist.values()))
+    zoneMap['initial_dist'] = [float(i)/maxVal for i in list(initialDist.values())]
 
-# Calculations
+# Calculation variables
 parkingDemand = {k: 0 for k in zoneIdMap.keys()}
 zoneAvgWait = {k: 0 for k in zoneIdMap.keys()}
-
 distGraph = []
 
 print("Starting simulation day")
@@ -83,11 +87,11 @@ for hour in range(24):
 
         bhatDistance = -1 * np.log(np.sum([np.sqrt(p * q) for p, q in zip(idealZoneDist, currDist)]))
         distGraph.append(bhatDistance)
-        print(f"Bhattacharyya distance: {bhatDistance}")
 
         # Update all vehicles
         controller.updateVehicles(bhatDistance)
 
+        print(f"Bhattacharyya distance: {bhatDistance}")
         print(f"High priority trips: {len(controller.highPriorityTrips)}")
         print(f"Roaming vehicles: {len(controller.roamingVehicles)}")
 
@@ -103,13 +107,20 @@ zoneMap['parking_demand'] = parkingDemandValues / np.max(parkingDemandValues)
 print(f"Zone with highest parking demand: {np.argmax(parkingDemandValues) + 1}")
 
 # Calculating per zone wait time
+zoneAvgWaitCount = {k: 0 for k in zoneIdMap.keys()}
 for vehicle in controller.allVehicles:
     for waitTime, zoneId in vehicle.totalTripWaitTime:
-        zoneAvgWait[zoneId] += waitTime * -1 / numTrips
+        zoneAvgWait[zoneId] += waitTime
+        zoneAvgWaitCount[zoneId] += 1
+
+for zoneId in zoneIdMap.keys():
+    if zoneAvgWaitCount[zoneId]:
+        zoneAvgWait[zoneId] /= zoneAvgWaitCount[zoneId] 
+
 zoneMap['wait_time'] = list(zoneAvgWait.values())
 
-plot(zoneMap, 'wait_time', title='Wait Time', save=True)
-plot(zoneMap, 'parking_demand', title='Parking Demand', save=True)
+plot(zoneMap, 'wait_time', title='Wait Time', save=False)
+#plot(zoneMap, 'parking_demand', title='Parking Demand', save=False)
 
 plt.show()
 
