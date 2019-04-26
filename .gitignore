@@ -108,6 +108,7 @@ venv.bak/
 data/
 output.csv
 
+*.npy
 *.png
 
 secret
