@@ -62,8 +62,10 @@ class Vehicle:
                     x, y = transformer.transform(step[1][0], step[1][1])
                     #print(f"Transformed coords: {x},{y}")
                     return self.near(Point(x, y))
-
-            raise RuntimeError(f"Route crawl failed: {timeGoal - timeSum} off")
+            
+            #raise RuntimeError(f"Route crawl failed: {timeGoal - timeSum} off")
+            x, y = transformer.transform(self.route[-1][1][0], self.route[-1][1][1])
+            return self.near(Point(x, y))
 
     def getCurrentBestLocationForAPI(self):
         if self.route is None:
@@ -76,7 +78,9 @@ class Vehicle:
                 if timeSum >= timeGoal:
                     # Format: "lat,long"
                     return f"{step[1][0]},{step[1][1]}"
-            raise RuntimeError("Route crawl failed for best location")
+
+            #raise RuntimeError("Route crawl failed for best location")
+            return f"{self.route[-1][1][0]},{self.route[-1][1][1]}"
 
 class VehicleController:
     def __init__(self, n, zoneDist, distanceTolerance):
@@ -125,6 +129,23 @@ class VehicleController:
             while sample == currZone:
                 sample = np.random.choice(_zoneKeyList)
             return sample
+
+    @staticmethod
+    def groupByTen(origins, destinations):
+        originsBuffered = []
+        destinationsBuffered = []
+        count = 1
+        for o, d in zip(origins, destinations):
+            if count == 1:
+                originsBuffered.append([])
+                destinationsBuffered.append([])
+            if count <= 10:
+                originsBuffered[-1].append(o)
+                destinationsBuffered[-1].append(d)
+            else:
+                count = 0
+            count += 1
+        return originsBuffered, destinationsBuffered
 
     def updateVehicles(self, bhatDist):
 
@@ -189,7 +210,8 @@ class VehicleController:
 
     def matchVehicles(self, trips):
 
-        googleMapsApiBuffer = []
+        mapsApiBufferFirst = []
+        mapsApiBufferSecond = []
      
         tripsToMatch = self.highPriorityTrips + trips.tolist()
         print(f"Attempting to match {len(tripsToMatch)} trips")
@@ -218,19 +240,20 @@ class VehicleController:
                     self.highPriorityTrips.append(trip)
                 continue
 
-            # If in same zone already, set travelTimeRemaining now and ignore later
-            sameZone = False
-            if bestDistance == 0:
-                # sample average centroid radius to get estimated pick up time, 17.6 is avg mph for NYC
-                time = math.ceil(np.random.uniform() * _zoneRadiusMap[trip[2]] / 17.6 * 60)
-                bestSav.travelTimeRemaining = time
-                sameZone = True
-          
             # Set next zone to trip's destination
             bestSav.travelZone = trip[2]
             bestSav.nextZone = trip[3]
 
-            googleMapsApiBuffer.append((bestSav, sameZone))
+            # If in same zone already, set travelTimeRemaining now and ignore later
+            if bestDistance == 0:
+                # sample average centroid radius to get estimated pick up time, 17.6 is avg mph for NYC
+                time = math.ceil(np.random.uniform() * _zoneRadiusMap[trip[2]] / 17.6 * 60)
+                bestSav.travelTimeRemaining = time
+            
+            else:
+                mapsApiBufferFirst.append(bestSav)
+
+            mapsApiBufferSecond.append(bestSav)
             self.travelingVehicles.append(bestSav)
 
             # Remove from available vehicles
@@ -251,59 +274,54 @@ class VehicleController:
         origins1 = []; origins2 = []
         destinations1 = []; destinations2 = []
 
-        googleMapsMask = np.zeros(len(googleMapsApiBuffer), dtype=int)
-        # get current -> travel times
-        for i, tup in enumerate(googleMapsApiBuffer):
-            sav, flag = tup
-            if flag is not True:
-                origins1.append(sav.getCurrentBestLocationForAPI())
-                destinations1.append(_zoneIdMap[sav.travelZone])
-                googleMapsMask[i] = 1
-
-        googleMapsMask = np.nonzero(googleMapsMask)[0]
-        googleMapsApiBufferMasked = [googleMapsApiBuffer[i] for i in googleMapsMask]
+        for av in mapsApiBufferFirst:
+            origins1.append(av.getCurrentBestLocationForAPI())
+            destinations1.append(_zoneIdMap[av.travelZone])
             
-        # get travel -> next times
-        for tup in googleMapsApiBuffer:
-            sav = tup[0]
-            origins2.append(_zoneIdMap[sav.travelZone])
-            destinations2.append(_zoneIdMap[sav.nextZone])
+        for av in mapsApiBufferSecond:
+            origins2.append(_zoneIdMap[av.travelZone])
+            destinations2.append(_zoneIdMap[av.nextZone])
 
-        # Send and await response
-        response1 = None
+        # Limit to 10 trips to per call
+        bufferOrigins1, bufferDestinations1 = self.groupByTen(origins1, destinations1)
+        bufferOrigins2, bufferDestinations2 = self.groupByTen(origins2, destinations2)
+
+        reconstruct1 = None
         if len(origins1) > 0:
             #print("Sending dist matrix request 1")
-            try:
-                response1 = self.gmapsClient.distance_matrix(origins1, destinations1)
-            except Exception as e:
-                print("Sending dist matrix request 1")
-                print(e)
-                print(len(origins1))
-                quit()
-            response1 = response1['rows']
+            reconstruct1 = []
+            for oBuf, dBuf in zip(bufferOrigins1, bufferDestinations1):
+                try:
+                    response = self.gmapsClient.distance_matrix(oBuf, dBuf)
+                    reconstruct1.extend(response['rows'])
+                except Exception as e:
+                    print("Sending dist matrix request 1")
+                    print(e)
+                    print(len(oBuf))
+                    quit()
 
-        response2 = None
+        reconstruct2 = None
         if len(origins2) > 0:
-            #print("Sending dist matrix request 2")
-            try:
-                response2 = self.gmapsClient.distance_matrix(origins2, destinations2)
-            except Exception as e:
-                print("Sending dist matrix request 2")
-                print(e)
-                print(len(origins2))
-                quit()
-            response2 = response2['rows']
+            reconstruct2 = []
+            for oBuf, dBuf in zip(bufferOrigins2, bufferDestinations2):
+                try:
+                    response = self.gmapsClient.distance_matrix(oBuf, dBuf)
+                    reconstruct2.extend(response['rows'])
+                except Exception as e:
+                    print("Sending dist matrix request 2")
+                    print(e)
+                    print(len(oBuf))
+                    quit()
 
         #print(f"Response 1:\n{response1}\n")
         # Assign current -> travel
-        if response1 is not None:
-            for tup, resp in zip(googleMapsApiBufferMasked, response1):
-                sav = tup[0]
-                sav.travelTimeRemaining = math.ceil(resp['elements'][0]['duration']['value'] / 60)
-                sav.totalTripWaitTime.append((int(sav.travelTimeRemaining), int(sav.travelZone)))
+        if reconstruct1 is not None:
+            for av, resp in zip(mapsApiBufferFirst, reconstruct1):
+                av.travelTimeRemaining = math.ceil(resp['elements'][0]['duration']['value'] / 60)
+                # For average wait time calculation
+                av.totalTripWaitTime.append((int(av.travelTimeRemaining), av.travelZone))
 
         # Assign travel -> next
-        if response2 is not None:
-            for tup, resp in zip(googleMapsApiBuffer, response2):
-                sav = tup[0]
-                sav.nextTravelTimeRemaining = math.ceil(resp['elements'][0]['duration']['value'] / 60)
+        if reconstruct2 is not None:
+            for av, resp in zip(mapsApiBufferSecond, reconstruct2):
+                av.nextTravelTimeRemaining = math.ceil(resp['elements'][0]['duration']['value'] / 60)

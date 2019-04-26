@@ -108,8 +108,8 @@ for vehicle in controller.allVehicles:
         zoneAvgWait[zoneId] += waitTime * -1 / numTrips
 zoneMap['wait_time'] = list(zoneAvgWait.values())
 
-plot(zoneMap, 'wait_time', title='Wait Time', save=False)
-plot(zoneMap, 'parking_demand', title='Parking Demand', save=False)
+plot(zoneMap, 'wait_time', title='Wait Time', save=True)
+plot(zoneMap, 'parking_demand', title='Parking Demand', save=True)
 
 plt.show()
 
@@ -118,9 +118,9 @@ if (printStats):
     print(" -- Stats --")
     print(f"Availible vehicles: {len(controller.parkedVehicles + controller.roamingVehicles)}")
     print(f"Traveling vehicles: {len(controller.travelingVehicles)}")
-    print(f"Google Maps Directions API Calls: {controller.gmapsClient.directionCount}")
-    print(f"Google Maps Destination Matrix API Calls: {controller.gmapsClient.distanceCount}")
-    print(f" => Total API Calls: {controller.gmapsClient.directionCount + controller.gmapsClient.distanceCount}")
+    #print(f"Google Maps Directions API Calls: {controller.gmapsClient.directionCount}")
+    #print(f"Google Maps Destination Matrix API Calls: {controller.gmapsClient.distanceCount}")
+    #print(f" => Total API Calls: {controller.gmapsClient.directionCount + controller.gmapsClient.distanceCount}")
 
 printDebug = False
 if (printDebug):

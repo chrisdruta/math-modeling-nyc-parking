@@ -12,6 +12,6 @@ plt.ylabel('Bhattacharyya Distance')
 plt.plot(np.arange(len(dist)), dist)
 plt.plot(np.arange(len(dist)), [1.5] * len(dist))
 
-plt.savefig("./bhat_dist.png", bbox_inches='tight', dpi=600)
+#plt.savefig("./bhat_dist.png", bbox_inches='tight', dpi=600)
 
 plt.show()
