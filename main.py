@@ -9,7 +9,7 @@ from geopandas.plotting import plot_polygon_collection
 import parser
 from vehicle import VehicleController
 
-def plot(geopandaMap, plotAxis, title=None, save=False):
+def plot(geopandaMap, plotAxis, edgeColors, title=None, save=False, extra=None):
     """
     Plots colored Geopandas GeoDataFrame objects
 
@@ -24,12 +24,19 @@ def plot(geopandaMap, plotAxis, title=None, save=False):
     if title:
         ax.set_title(title)
     
-    idk = plot_polygon_collection(ax, geopandaMap.geometry, geopandaMap[plotAxis], edgecolor='black')
-    plt.colorbar(cax=ax,mappable=idk)
+    if edgeColors is True:
+        idk = plot_polygon_collection(ax, geopandaMap.geometry, geopandaMap[plotAxis], edgecolor='black')
+    else:
+        idk = plot_polygon_collection(ax, geopandaMap.geometry, geopandaMap[plotAxis])
+    if extra is not None:
+        cbar = plt.colorbar(ax=ax,mappable=idk, ticks=[extra[0], extra[1]])
+        cbar.ax.set_yticklabels(['Lower', 'Higher'])
+    else:
+        cbar = plt.colorbar(ax=ax,mappable=idk)
     plt.axis('off')
 
     if save:
-        plt.savefig("./{}.png".format(plotAxis), bbox_inches='tight', dpi=1000)
+        plt.savefig("./{}.png".format(plotAxis), bbox_inches='tight', dpi=800)
 
 # Read in nyc zone map
 zoneIdMap = parser.readZoneIdMap()
@@ -37,9 +44,9 @@ zoneMap = geopandas.read_file('taxi_zones/taxi_zones.shp')
 
 # Set parameters
 n = 250
-p = 0.05
+p = 0.02
 numDataSets = 6
-crit = 1.5
+crit = 2
 
 print("Generating trips...")
 trips, zoneDist = parser.generateTripsAndZoneDist("./data/output.csv", numDataSets, p)
@@ -107,20 +114,18 @@ zoneMap['parking_demand'] = parkingDemandValues / np.max(parkingDemandValues)
 print(f"Zone with highest parking demand: {np.argmax(parkingDemandValues) + 1}")
 
 # Calculating per zone wait time
-zoneAvgWaitCount = {k: 0 for k in zoneIdMap.keys()}
 for vehicle in controller.allVehicles:
     for waitTime, zoneId in vehicle.totalTripWaitTime:
-        zoneAvgWait[zoneId] += waitTime
-        zoneAvgWaitCount[zoneId] += 1
+        zoneAvgWait[zoneId] += waitTime * -1 /numTrips
+        
+zoneAvgWait = list(zoneAvgWait.values())
 
-for zoneId in zoneIdMap.keys():
-    if zoneAvgWaitCount[zoneId]:
-        zoneAvgWait[zoneId] /= zoneAvgWaitCount[zoneId] 
+zoneMap['wait_time'] = zoneAvgWait
 
-zoneMap['wait_time'] = list(zoneAvgWait.values())
+extra = (np.min(zoneAvgWait), np.max(zoneAvgWait))
 
-plot(zoneMap, 'wait_time', title='Wait Time', save=False)
-#plot(zoneMap, 'parking_demand', title='Parking Demand', save=False)
+plot(zoneMap, 'wait_time', True, title=f'n = {n}, p = {p}', save=True, extra=extra)
+plot(zoneMap, 'parking_demand', False, save=True)
 
 plt.show()
 
@@ -129,9 +134,9 @@ if (printStats):
     print(" -- Stats --")
     print(f"Availible vehicles: {len(controller.parkedVehicles + controller.roamingVehicles)}")
     print(f"Traveling vehicles: {len(controller.travelingVehicles)}")
-    #print(f"Google Maps Directions API Calls: {controller.gmapsClient.directionCount}")
-    #print(f"Google Maps Destination Matrix API Calls: {controller.gmapsClient.distanceCount}")
-    #print(f" => Total API Calls: {controller.gmapsClient.directionCount + controller.gmapsClient.distanceCount}")
+    # print(f"Google Maps Directions API Calls: {controller.gmapsClient.directionCount}")
+    # print(f"Google Maps Destination Matrix API Calls: {controller.gmapsClient.distanceCount}")
+    # print(f" => Total API Calls: {controller.gmapsClient.directionCount + controller.gmapsClient.distanceCount}")
 
 printDebug = False
 if (printDebug):

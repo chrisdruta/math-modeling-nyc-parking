@@ -96,7 +96,7 @@ class VehicleController:
 
         self.highPriorityTrips = []
 
-        mock = True
+        mock = False
         if mock is True:
             self.gmapsClient = MockClient()
         else:
@@ -236,7 +236,7 @@ class VehicleController:
 
             if bestSav == None:
                 if trip not in self.highPriorityTrips:
-                    print(f"high priority pickup:{trip[2]}, trip:{trip}")
+                    #print(f"high priority pickup:{trip[2]}, trip:{trip}")
                     self.highPriorityTrips.append(trip)
                 continue
 
@@ -249,6 +249,7 @@ class VehicleController:
                 # sample average centroid radius to get estimated pick up time, 17.6 is avg mph for NYC
                 time = math.ceil(np.random.uniform() * _zoneRadiusMap[trip[2]] / 17.6 * 60)
                 bestSav.travelTimeRemaining = time
+                bestSav.totalTripWaitTime.append((time, bestSav.travelZone))
             
             else:
                 mapsApiBufferFirst.append(bestSav)

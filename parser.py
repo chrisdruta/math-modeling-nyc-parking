@@ -48,12 +48,13 @@ def generateTripsAndZoneDist(filename, numDataSets, percentUsing):
     for d in data:
         timeDistribution[d[0]] += 1
         zoneDistribution[d[2]] += 1
+        zoneDistribution[d[3]] += 1
 
     total = len(data)
     for i in range(24):
         timeDistribution[i] /= total
     for i in range(1,zoneData[-1][0] + 1):
-        zoneDistribution[i] /= total
+        zoneDistribution[i] /= (2 * total)
 
     # n = number of data points divided by (30 * number of datasets) * 0.02 (2% of population uses it)
     n = int(len(data) / (30 * numDataSets) * percentUsing)
