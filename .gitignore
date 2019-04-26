@@ -109,3 +109,5 @@ yellow_tripdata_*
 output.csv
 
 *.png
+
+secret

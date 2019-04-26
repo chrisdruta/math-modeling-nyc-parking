@@ -42,7 +42,7 @@ print(f"Number of trips: {numTrips}")
 
 # Initate controller
 idealZoneDist = np.array(list(zoneDist.values()))
-n = 500
+n = 250
 crit = 1.5
 controller = VehicleController(n, zoneDist, crit)
 print("Finished setting up model controller")
@@ -113,7 +113,7 @@ plot(zoneMap, 'parking_demand', title='Parking Demand', save=False)
 
 plt.show()
 
-printStats = False
+printStats = True
 if (printStats):
     print(" -- Stats --")
     print(f"Availible vehicles: {len(controller.parkedVehicles + controller.roamingVehicles)}")
