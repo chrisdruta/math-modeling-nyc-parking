@@ -109,6 +109,5 @@ data/
 output.csv
 
 *.npy
-*.png
 
 secret
