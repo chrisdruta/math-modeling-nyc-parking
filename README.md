@@ -2,9 +2,11 @@
 
 Simulation of fleet of autonomous vehicles to visualize traffic / parking demand for NYC that utilizes real data with Google Maps API. [Project Poster](https://github.com/chrisdruta/math-modeling-nyc-parking/blob/master/images/poster.pdf "Poster")
 
-> Example parking demand visualization
+<p align="center">
+    <img src="https://raw.githubusercontent.com/chrisdruta/math-modeling-nyc-parking/master/images/1.png" width="60%">
+</p>
 
-<img src="https://raw.githubusercontent.com/chrisdruta/math-modeling-nyc-parking/master/images/1.png" width="60%">
+> Example parking demand visualization
 
 ## Installing Dependencies
 
