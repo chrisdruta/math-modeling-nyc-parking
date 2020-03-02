@@ -1,6 +1,6 @@
 # math-modeling-nyc-parking
 
-Simulation of a fleet of autonomous vehicles to visualize traffic / parking demand for NYC that utilizes historical NYC taxi zoning data (courtesy of NYC government Taxi & Limosuine Commision) with realistic travel estimations via Google Maps API. [Project Poster](https://github.com/chrisdruta/math-modeling-nyc-parking/blob/master/images/poster.pdf "Poster")
+Simulation of a fleet of autonomous vehicles to visualize traffic / parking demand for NYC that utilizes historical NYC taxi zoning data (courtesy of NYC government Taxi & Limousine Commission) with realistic travel estimations via Google Maps API. [Project Poster](https://github.com/chrisdruta/math-modeling-nyc-parking/blob/master/images/poster.pdf "Poster")
 
 <p align="center">
     <img src="https://raw.githubusercontent.com/chrisdruta/math-modeling-nyc-parking/master/images/1.png" width="60%">
